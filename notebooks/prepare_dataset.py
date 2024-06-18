@@ -59,19 +59,21 @@ machine_types = [ "fan", "valve" ]  # 분류할 기계의 종류
 data_class = [ "normal", "abnormal", "unknown"]  # 분류할 데이터의 종류
 
 
-def get_data_paths_and_labels(machine, base_dir="data/") : 
+def get_data_paths_and_labels_from_machine(machine, base_dir="data/") : 
     '''
-    Before find data, get datasets names and labels in specific machine
-    dirs[”DCASE”][”2020”][”dev”]["train"][”normal”] = {real_path}
-    dirs[”MIMII”][”data_-6_db”]["id_00][”normal”] = {real_path}
+    data_path를 조합 -> dcase 혹은 mimii 데이터셋의 디렉토리 경로와 label을 추출
 
-    inputs :
-    machine : 기기 이름
-    base_dir : 데이터가 저장된 기본 경로
+    ex)
+    data_dict[”DCASE”][”2020”][”dev”]["train"][”normal”] = {real_path},
+    data_dict[”MIMII”][”data_-6_db”]["id_00][”normal”] = {real_path}
 
-    outputs :
-    dirs : dictionary of dataset names
-    labels : dictionary of dataset labels (0 is abnormal, 1 is normal, -1 is something wrong)
+    inputs
+    machine : string, 분류할 기계의 종류
+    base_dir : string, 데이터셋이 저장된 디렉토리 경로 (상대경로)
+
+    outputs
+    data_dict : dictionary, 데이터셋의 디렉토리 경로, { key : DCASE or MIMII, value : { key : year or db, value : { key : dev or eval or add or train or test, value : { key : normal or abnormal, value : 디렉토리 경로 } } } }
+    label_dict : dictionary, 데이터셋의 label { key : 디렉토리 경로, value : label_list}
     '''
 
     data_dict = dict()
@@ -80,6 +82,7 @@ def get_data_paths_and_labels(machine, base_dir="data/") :
     # TODO : other iterations for each data_case
 
     # DCASE
+    # 연도별로 데이터셋을 대분류
     data_dict[data_case[0]] = dict()
     label_dict[data_case[0]] = dict()
 
@@ -90,6 +93,7 @@ def get_data_paths_and_labels(machine, base_dir="data/") :
         data_dict[data_case[0]][year], label_dict[data_case[0]][year] = get_from_dcase(machine, year, base_dir = base_dir)
     
     # MIMII
+    # 데시벨 별로 데이터셋을 대분류
     data_dict[data_case[1]] = dict()
     label_dict[data_case[1]] = dict()
 
@@ -104,10 +108,14 @@ def get_data_paths_and_labels(machine, base_dir="data/") :
 
 def get_from_dcase(machine, year, base_dir) :
     '''
-    data_path를 조합 -> get_dcase_data_paths_and_labels_from_edge_dir 함수에 넣어서 데이터셋의 디렉토리 경로와 label을 추출
-    data_path key : 
-    data_path value : "data/DCASE/{year}/{dataset_class}/{machine_type}/{data_class}/{file_name}"
+    DCASE 데이터셋의 디렉토리 경로와 label을 추출
+    dev, eval, add 데이터셋으로 중분류
+    train, test 데이터셋으로 소분류
+
+    ex) data_dict["train"][”normal”] = {real_path}
+
     inputs
+    machine : string, 분류할 기계의 종류
     year : string, 데이터셋의 연도
     base_dir : string, 데이터셋이 저장된 디렉토리 경로
 
@@ -146,22 +154,33 @@ def get_from_dcase(machine, year, base_dir) :
         
 
 def get_from_mimii(machine, decibel, base_dir) :
+    '''
+    MIMII 데이터셋의 디렉토리 경로와 label을 추출
+
+    ex) data_dict["normal"] = {real_path}
+
+    inputs
+    machine : string, 분류할 기계의 종류
+    year : string, 데이터셋의 연도
+    base_dir : string, 데이터셋이 저장된 디렉토리 경로
+
+    outputs
+    data_dict : dictionary, 데이터셋의 디렉토리 경로, { key : dataset_class, value : data_path}
+    labels : dictionary, 데이터셋의 label { key : data_path, value : label_list}
+    '''
 
     data_dict = dict()
     label_dict = dict()
-    for decibel in mimii_dbs :
-        data_path = base_dir + "MIMII/" + decibel + "/" + machine + '/' # data/MIMII/data_-6_dB/fan/
-        
-        data_dict[decibel] = dict()
-        label_dict[decibel] = dict()
-        for each_id in mimii_ids :
-            for each_data_class in data_class :
-                if each_data_class == data_class[2] :
-                    break
-                tmp_data_path = data_path + each_id + "/" # data/MIMII/data_-6_dB/fan/id_00/
-                tmp_data_path = tmp_data_path + each_data_class + "/" # tmp_data_path : "data/MIMII/data_-6_dB/fan/id_00/normal/"
 
-                data_dict[decibel], label_dict[decibel] = get_data_paths_and_labels_from_edge_dir(tmp_data_path)
+    data_path = base_dir + "MIMII/" + decibel + "/" + machine + '/' # data/MIMII/data_-6_dB/fan/
+    for each_id in mimii_ids :
+        for each_data_class in data_class :
+            if each_data_class == data_class[2] :
+                break
+            tmp_data_path = data_path + each_id + "/" # data/MIMII/data_-6_dB/fan/id_00/
+            tmp_data_path = tmp_data_path + each_data_class + "/" # tmp_data_path : "data/MIMII/data_-6_dB/fan/id_00/normal/"
+
+            data_dict, label_dict = get_data_paths_and_labels_from_edge_dir(tmp_data_path)
 
     return data_dict, label_dict
         
@@ -170,6 +189,9 @@ def get_data_paths_and_labels_from_edge_dir(data_path) :
     '''
     data_path 에 있는 모든 *.wav 파일의 경로와 label을 dircionary로 반환
     label_dict 가 의미 없는 값일 수 있으나, label 값을 binary 로 mapping 하기 위해 사용
+    경로 상에서 의미있는 값은 출력하게 해놨음
+
+    ex) data_dict["normal"] = {real_path}
 
     inputs
     data_path : string, *.wav 파일이 저장된 디렉토리 경로
