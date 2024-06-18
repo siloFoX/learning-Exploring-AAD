@@ -187,7 +187,7 @@ def get_data_paths_and_labels_from_edge_dir(data_path) :
 
     data_path_list = os.listdir(data_path) # data_path에 있는 모든 파일 리스트
     for each_data in data_path_list :
-        each_data_full_path = data_path + "/" + each_data # data_path에 있는 각 파일의 전체 경로
+        each_data_full_path = data_path + each_data # data_path에 있는 각 파일의 전체 경로
         dirname = data_path.split("/")[-2] # data_path의 마지막 디렉토리 이름
 
         if data_class[0] in each_data or dirname == data_class[0] :
